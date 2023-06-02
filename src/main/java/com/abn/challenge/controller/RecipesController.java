@@ -2,22 +2,24 @@ package com.abn.challenge.controller;
 
 import com.abn.challenge.dao.RecipeRepository;
 import com.abn.challenge.model.Recipe;
+import com.abn.challenge.util.RecipeUtil;
 import com.abn.challenge.view.RecipeDTO;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import net.kaczmarzyk.spring.data.jpa.domain.Equal;
-import net.kaczmarzyk.spring.data.jpa.domain.In;
+import net.kaczmarzyk.spring.data.jpa.domain.IsMember;
+import net.kaczmarzyk.spring.data.jpa.domain.IsNotMember;
 import net.kaczmarzyk.spring.data.jpa.domain.LikeIgnoreCase;
 import net.kaczmarzyk.spring.data.jpa.web.annotation.And;
 import net.kaczmarzyk.spring.data.jpa.web.annotation.Spec;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.http.ResponseEntity;
+import org.springframework.data.rest.webmvc.ResourceNotFoundException;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Optional;
 
 @RestController
@@ -27,47 +29,49 @@ public class RecipesController {
     @Autowired
     private RecipeRepository repository;
 
-    @GetMapping
-    public List<Recipe> getAll(){
-        return repository.findAll();
-    }
-
     @GetMapping("{id}")
-    public ResponseEntity<Recipe> findById(@RequestParam(value = "id") Long id){
+    @ResponseStatus(value = HttpStatus.OK)
+    public Recipe findById(@PathVariable("id") @Valid @Min(1) long id){
         Optional<Recipe> recipe = repository.findById(id);
-        return recipe.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+        return recipe.orElseThrow(() -> new ResourceNotFoundException(String.format("ID = %s", id)));
     }
 
     @PostMapping
-    public ResponseEntity<Recipe> save(@RequestBody RecipeDTO recipe){
-        return ResponseEntity.ok(repository.save(recipe.toPersistent(null)));
+    @ResponseStatus(value = HttpStatus.OK)
+    public Recipe save(@RequestBody @Valid RecipeDTO recipe){
+        return repository.save(RecipeUtil.toPersistent(recipe, null));
     }
 
     @PutMapping("{id}")
-    public ResponseEntity<Recipe> edit(@RequestParam(value = "id") Long id, @RequestBody RecipeDTO recipe){
-        return ResponseEntity.ok(repository.save(recipe.toPersistent(id)));
+    @ResponseStatus(value = HttpStatus.OK)
+    public Recipe edit(@PathVariable("id") @Min(1) long id, @RequestBody @Valid RecipeDTO recipe){
+        if(repository.findById(id).isPresent())
+            return repository.save(RecipeUtil.toPersistent(recipe, id));
+        else
+            throw new ResourceNotFoundException();
     }
 
     @DeleteMapping("{id}")
-    public ResponseEntity<Void> remove(@RequestParam(value = "id") Long id){
+    @ResponseStatus(value = HttpStatus.NO_CONTENT)
+    public void remove(@PathVariable("id") @Min(1) Long id){
         repository.deleteById(id);
-        return ResponseEntity.ok().build();
     }
 
     @GetMapping("filter")
-    @Parameter(in = ParameterIn.QUERY, name = "title", content = @Content(schema = @Schema(type = "string")))
-    @Parameter(in = ParameterIn.QUERY, name = "vegetarian", content = @Content(schema = @Schema(type = "boolean", defaultValue = "false")))
-    @Parameter(in = ParameterIn.QUERY, name = "servings", content = @Content(schema = @Schema(type = "integer", defaultValue = "0")))
-    @Parameter(in = ParameterIn.QUERY, name = "ingredients", content = @Content(schema = @Schema(type = "string")))
-    @Parameter(in = ParameterIn.QUERY, name = "instructions", content = @Content(schema = @Schema(type = "string")))
-    public List<Recipe> filterByParent(@And({
-            @Spec(path="title", pathVars="title", spec = LikeIgnoreCase.class),
-            @Spec(path="vegetarian", pathVars="vegetarian", spec = Equal.class),
-            @Spec(path="servings", pathVars="servings", spec = Equal.class),
-            @Spec(path="ingredients", pathVars="ingredients", spec = In.class),
-            @Spec(path="instructions", pathVars="instructions", spec = LikeIgnoreCase.class)
-    }) Specification<Recipe> specs) {
-        return repository.findAll(specs);
+    public Page<Recipe> filter(@And({
+            @Spec(path="title", spec = LikeIgnoreCase.class),
+            @Spec(path="vegetarian", spec = Equal.class),
+            @Spec(path="servings", spec = Equal.class),
+            @Spec(path="ingredients", params = "ingredients-include", paramSeparator = ',', spec = IsMember.class),
+            @Spec(path="ingredients", params = "ingredients-exclude", paramSeparator = ',', spec = IsNotMember.class),
+            @Spec(path="instructions", spec = LikeIgnoreCase.class)
+    }) @Valid Specification<Recipe> specs, @RequestParam("page") @Min(0) int page,
+                               @RequestParam("size") @Min(1) int size) {
+        Page<Recipe> fullPage = repository.findAll(specs, Pageable.ofSize(size).withPage(page));
+        if(fullPage.getTotalElements() > 0)
+            return fullPage;
+        else
+            throw new ResourceNotFoundException();
     }
 
 }

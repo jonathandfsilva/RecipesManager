@@ -1,11 +1,11 @@
 package com.abn.challenge.model;
 
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import javax.persistence.*;
 import java.util.List;
 
 @Data
@@ -21,7 +21,10 @@ public class Recipe {
     private String title;
     boolean vegetarian;
     int servings;
-    @ElementCollection
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "recipe_ingredients", joinColumns = @JoinColumn(name = "recipe_id"))
+    @Column(name = "ingredients")
     List<String> ingredients;
     String instructions;
 

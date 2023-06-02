@@ -1,23 +1,13 @@
 package com.abn.challenge.view;
 
-import com.abn.challenge.model.Recipe;
-import lombok.Data;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 
 import java.util.List;
 
-@Data
-public class RecipeDTO {
-
-    private String title;
-    boolean vegetarian;
-    int servings;
-    List<String> ingredients;
-    String instructions;
-
-    public Recipe toPersistent(Long id){
-        return  Recipe.builder().id(id).title(this.title).vegetarian(this.vegetarian)
-                .servings(this.servings).ingredients(this.ingredients)
-                .instructions(this.instructions).build();
-    }
-
-}
+public record RecipeDTO(
+        @NotBlank String title, boolean vegetarian,
+        @Min(1) int servings,
+        @NotEmpty List<String> ingredients,
+        @NotEmpty String instructions) {}
