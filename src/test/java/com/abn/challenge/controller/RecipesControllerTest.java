@@ -5,6 +5,8 @@ import com.abn.challenge.model.Recipe;
 import com.abn.challenge.view.RecipeDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.instancio.Instancio;
+import org.instancio.settings.Keys;
+import org.instancio.settings.Settings;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -20,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@TestPropertySource(value = "classpath:application-integration-tests.properties")
+@TestPropertySource(locations = "classpath:application-integration-tests.properties")
 class RecipesControllerTest {
 
     @Autowired
@@ -31,9 +33,11 @@ class RecipesControllerTest {
 
     private static final String BASE_PATH = "/recipes/";
 
+    Settings settings = Settings.create().set(Keys.BEAN_VALIDATION_ENABLED, true);
+
     @Test
     void getFound() throws Exception {
-        Recipe recipe = repository.save(Instancio.of(Recipe.class).create());
+        Recipe recipe = repository.save(Instancio.of(Recipe.class).withSettings(settings).create());
         MockHttpServletResponse response = performGet(recipe.getId().toString());
         assertEquals(HttpStatus.OK.value(), response.getStatus());
     }
@@ -46,14 +50,14 @@ class RecipesControllerTest {
 
     @Test
     void saveSuccess() throws Exception {
-        RecipeDTO recipe = Instancio.of(RecipeDTO.class).create();
+        RecipeDTO recipe = Instancio.of(RecipeDTO.class).withSettings(settings).create();
         MockHttpServletResponse response = performPost(recipe);
         assertEquals(HttpStatus.OK.value(), response.getStatus());
     }
 
     @Test
     void editSuccess() throws Exception {
-        Recipe recipe = repository.save(Instancio.of(Recipe.class).create());
+        Recipe recipe = repository.save(Instancio.of(Recipe.class).withSettings(settings).create());
         RecipeDTO newRecipe = Instancio.of(RecipeDTO.class).create();
         MockHttpServletResponse response = performPut(recipe.getId().toString(), newRecipe);
         assertEquals(HttpStatus.OK.value(), response.getStatus());
@@ -61,7 +65,7 @@ class RecipesControllerTest {
 
     @Test
     void editNotFound() throws Exception {
-        RecipeDTO newRecipe = Instancio.of(RecipeDTO.class).create();
+        RecipeDTO newRecipe = Instancio.of(RecipeDTO.class).withSettings(settings).create();
         MockHttpServletResponse response = performPut("99999999", newRecipe);
         assertEquals(HttpStatus.NOT_FOUND.value(), response.getStatus());
     }
@@ -69,7 +73,7 @@ class RecipesControllerTest {
     @Test
     void paginatedSearch() throws Exception {
         String query = String.format("filter?page=%s&size=%s", 0, 5);
-        repository.saveAll(Instancio.ofList(Recipe.class).size(5).create());
+        repository.saveAll(Instancio.ofList(Recipe.class).size(5).withSettings(settings).create());
         MockHttpServletResponse response = performGet(query);
         assertEquals(HttpStatus.OK.value(), response.getStatus());
     }
@@ -77,14 +81,14 @@ class RecipesControllerTest {
     @Test
     void filterNotFound() throws Exception {
         String query = String.format("filter?page=%s&size=%s&instructions=LOREM-IPSUM", 0, 5);
-        repository.saveAll(Instancio.ofList(Recipe.class).size(3).create());
+        repository.saveAll(Instancio.ofList(Recipe.class).size(3).withSettings(settings).create());
         MockHttpServletResponse response = performGet(query);
         assertEquals(HttpStatus.NOT_FOUND.value(), response.getStatus());
     }
 
     @Test
     void deleteSuccess() throws Exception {
-        Recipe recipe = repository.save(Instancio.of(Recipe.class).create());
+        Recipe recipe = repository.save(Instancio.of(Recipe.class).withSettings(settings).create());
         MockHttpServletResponse response = performDelete(recipe.getId().toString());
         assertEquals(HttpStatus.NO_CONTENT.value(), response.getStatus());
     }
